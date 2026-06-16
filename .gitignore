@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+
+# Virtual Environment
+venv/
+env/
+.venv/
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Output directory (generated at runtime)
+output/
+
+# Byte-compiled
+*.pyc
+
+# Logs
+*.log
+
+# Environment variables
+.env
+.env.local
+
+# Model cache (EasyOCR downloads)
+~/.EasyOCR/
+
+# pytest
+.pytest_cache/
+htmlcov/
+.coverage
