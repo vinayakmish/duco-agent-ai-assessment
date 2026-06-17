@@ -1,0 +1,64 @@
+{
+  "plan_a": {
+    "plan_id": "PLAN_A",
+    "insurer_name": "Insurer1",
+    "plan_name": "Corporate Health Shield - Plan A",
+    "primary_holder": {
+      "name": "Priya Sen",
+      "relationship": "self",
+      "dob": "1988-03-15",
+      "employee_id": "EMP-A-10234",
+      "policy_number": "INS1-2024-HLT-78432"
+    },
+    "dependents": [
+      {
+        "name": "Aarav Sen",
+        "relationship": "spouse",
+        "dob": "1986-07-22",
+        "policy_number": "INS1-2024-HLT-78432-D1"
+      }
+    ],
+    "coverage": {
+      "annual_deductible": 10000,
+      "coinsurance_in_network": 0.80,
+      "coinsurance_out_of_network": 0.60,
+      "oop_maximum": 100000,
+      "preauth_required_threshold": 100000,
+      "pt_sessions_per_year": 20,
+      "pt_copay_per_session": 2000,
+      "covered_cpt_codes": ["29888", "29881", "97161", "97110"],
+      "network_hospitals": ["Mumbai Ortho Center", "City Surgical Hospital"]
+    }
+  },
+  "plan_b": {
+    "plan_id": "PLAN_B",
+    "insurer_name": "Insurer2",
+    "plan_name": "Premium Health Plus - Plan B",
+    "primary_holder": {
+      "name": "Aarav Sen",
+      "relationship": "self",
+      "dob": "1986-07-22",
+      "employee_id": "EMP-B-55891",
+      "policy_number": "INS2-2024-HLT-91205"
+    },
+    "dependents": [
+      {
+        "name": "Priya Sen",
+        "relationship": "spouse",
+        "dob": "1988-03-15",
+        "policy_number": "INS2-2024-HLT-91205-D1"
+      }
+    ],
+    "coverage": {
+      "annual_deductible": 15000,
+      "coinsurance_in_network": 0.70,
+      "coinsurance_out_of_network": 0.50,
+      "oop_maximum": 150000,
+      "preauth_required_for_surgery": true,
+      "pt_sessions_per_year": 30,
+      "pt_copay_per_session": 1500,
+      "covered_cpt_codes": ["29888", "29881", "97161", "97110"],
+      "network_hospitals": ["Mumbai Ortho Center", "National Knee Institute"]
+    }
+  }
+}
