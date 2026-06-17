@@ -162,6 +162,10 @@ INTAKE → EXTRACTION → COB_REASONING → DOCUMENT_GENERATION → VALIDATION �
 # 1. Clone and install dependencies
 git clone https://github.com/vinayakmish/duco-agent-ai-assessment.git
 cd duco-agent-ai-assessment
+# Create virtual environment (recommended)
+python -m venv venv
+venv\Scripts\activate      # Windows
+
 pip install -r requirements.txt
 
 # 2. Generate mock medical documents + run full pipeline
