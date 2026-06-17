@@ -1,0 +1,14 @@
+easyocr
+pytesseract
+pdfplumber
+Pillow
+fastapi
+uvicorn[standard]
+jinja2
+matplotlib
+transitions
+rich
+pytest
+httpx
+reportlab
+gTTS
