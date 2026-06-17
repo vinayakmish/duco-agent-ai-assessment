@@ -20,7 +20,15 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.logging import RichHandler
 
-console = Console()
+import sys
+import io
+
+# Force UTF-8 output on Windows
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+
+console = Console(force_terminal=True)
 
 
 def setup_logging(verbose: bool = False):
@@ -50,21 +58,15 @@ def generate_mock_data():
 
 def print_banner():
     """Print the DuCO-Agent banner."""
-    banner = """
-    ╔══════════════════════════════════════════════════════════════╗
-    ║                                                              ║
-    ║   ██████╗ ██╗   ██╗ ██████╗ ██████╗                         ║
-    ║   ██╔══██╗██║   ██║██╔════╝██╔═══██╗                        ║
-    ║   ██║  ██║██║   ██║██║     ██║   ██║  Agent                 ║
-    ║   ██║  ██║██║   ██║██║     ██║   ██║                        ║
-    ║   ██████╔╝╚██████╔╝╚██████╗╚██████╔╝                       ║
-    ║   ╚═════╝  ╚═════╝  ╚═════╝ ╚═════╝                        ║
-    ║                                                              ║
-    ║   Dual Coverage Orchestration Agent                          ║
-    ║   Health Insurance Coordination of Benefits (COB)            ║
-    ║                                                              ║
-    ╚══════════════════════════════════════════════════════════════╝
-    """
+    banner = (
+        "\n"
+        "  ================================================================\n"
+        "                                                                  \n"
+        "    DuCO-Agent  (Dual Coverage Orchestration Agent)               \n"
+        "    Health Insurance Coordination of Benefits (COB)               \n"
+        "                                                                  \n"
+        "  ================================================================\n"
+    )
     console.print(banner, style="bold cyan")
 
 
