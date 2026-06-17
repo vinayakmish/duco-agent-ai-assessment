@@ -154,16 +154,16 @@ class PlannerAgent:
             path = os.path.join(self.data_dir, f)
             if os.path.exists(path):
                 existing.append(f)
+                logger.info(f"  Found: {f}")
             else:
                 missing.append(f)
+                logger.warning(f"  Missing: {f}")
         self.context["input_files"] = existing
         self.context["missing_files"] = missing
         logger.info(f"Found {len(existing)}/{len(files)} input files")
-        if missing:
-            logger.warning(f"Missing files: {missing}")
 
     def _execute_extraction(self):
-        """EXTRACTION: OCR, PDF parse, text parse → structured data."""
+        """EXTRACTION: OCR, PDF parse, text parse -> structured data."""
         logger.info("Extracting data from multi-modal inputs...")
         agent = self.context.get("intake_agent")
         if agent is None:
@@ -172,6 +172,28 @@ class PlannerAgent:
 
         intake_result = agent.process_all_inputs()
         self.context["intake_result"] = intake_result
+
+        # Report per-document status
+        if intake_result.pt_invoice:
+            engine = intake_result.pt_invoice.raw_ocr_text[:30] and "completed"
+            logger.info(f"  OCR completed: priya_pt_invoice.png (patient: {intake_result.pt_invoice.patient_name}, amount: Rs.{intake_result.pt_invoice.total_amount:,.0f})")
+        else:
+            logger.warning("  OCR failed: priya_pt_invoice.png")
+
+        if intake_result.mri_report:
+            logger.info(f"  PDF parsing completed: aarav_mri_report.pdf (patient: {intake_result.mri_report.patient_name}, ACL tear: {intake_result.mri_report.findings.get('acl_tear', False)})")
+        else:
+            logger.warning("  PDF parsing failed: aarav_mri_report.pdf")
+
+        if intake_result.surgeon_estimate:
+            logger.info(f"  OCR completed: surgeon_estimate.jpg (patient: {intake_result.surgeon_estimate.patient_name}, total: Rs.{intake_result.surgeon_estimate.total_estimated_cost:,.0f})")
+        else:
+            logger.warning("  OCR failed: surgeon_estimate.jpg")
+
+        if intake_result.user_query:
+            logger.info(f"  Text parsing completed: user_query.txt (actions: {intake_result.user_query.actions_requested})")
+        else:
+            logger.warning("  Text parsing failed: user_query.txt")
 
         # Collect all extracted codes for validation
         codes = []
@@ -184,9 +206,11 @@ class PlannerAgent:
             codes.extend(c.code for c in intake_result.surgeon_estimate.cpt_codes)
         self.context["extracted_codes"] = codes
 
-        logger.info(f"Extracted {len(codes)} medical codes")
-        if intake_result.errors:
-            logger.warning(f"Extraction errors: {intake_result.errors}")
+        # Report inferred codes
+        if codes:
+            code_str = ", ".join(codes)
+            logger.info(f"  Medical codes inferred: {code_str}")
+        logger.info(f"Extracted {len(codes)} medical codes total")
 
     def _execute_cob_reasoning(self):
         """COB_REASONING: Determine primary/secondary, calculate claims."""
