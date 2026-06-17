@@ -1,226 +1,283 @@
-# DuCO-Agent: Agentic Multi-Modal Insurance COB System
+# DuCO-Agent: Dual Coverage Orchestration Agent
 
-> An Agentic, Multi-Modal AI System for Coordination of Benefits (COB) in dual health insurance coverage, built with a Planner-Critic architecture.
+An **agentic AI system** for processing health insurance claims under **Coordination of Benefits (COB)** when a patient has dual coverage. Built with a Planner/Critic architecture and a 6-state pipeline.
 
----
+## Scenario
 
-## Overview
+**Priya and Aarav Sen** are a married couple in Mumbai with dual health insurance:
 
-DuCO-Agent automates the complex process of navigating dual health insurance coverage for a married couple (Priya & Aarav Sen). It ingests multi-modal medical documents, coordinates with mock insurance APIs, applies COB rules to optimize out-of-pocket expenses, and generates actionable outputs including pre-authorization letters, financial breakdowns, and visual cost flows.
+| Plan | Insurer | Primary Holder | Dependent |
+|------|---------|---------------|-----------|
+| Plan A | Insurer1 (Corporate Health Shield) | Priya Sen | Aarav Sen |
+| Plan B | Insurer2 (Premium Health Plus) | Aarav Sen | Priya Sen |
+
+**Claims:**
+- **Aarav**: ACL reconstruction + meniscectomy (₹4,50,000)
+- **Priya**: Physical therapy for chronic lower back pain (₹30,000)
 
 ## Architecture
 
-### Agent Architecture (Planner + Critic Pattern)
-
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        PLANNER AGENT                            │
-│  Reasons about current state → selects & invokes tools:         │
-│                                                                 │
-│  ├── parse_image(file)          → EasyOCR text extraction       │
-│  ├── parse_pdf(file)            → pdfplumber clinical parsing   │
-│  ├── parse_text(file)           → Intent & entity extraction    │
-│  ├── lookup_medical_code(desc)  → CPT/ICD-10 mapping           │
-│  ├── verify_coverage(plan, cpt) → Mock API coverage check       │
-│  ├── check_preauth(plan, proc)  → Pre-auth requirement check    │
-│  ├── calculate_claim(plan, amt) → Deductible + coinsurance calc │
-│  ├── generate_preauth(claim)    → IRDAI-compliant letter gen    │
-│  ├── generate_visual(results)   → Sankey/bar/savings charts     │
-│  └── generate_briefing(results) → Patient-friendly summary      │
-│                                                                 │
-├────────────────────────── ↕ ────────────────────────────────────┤
-│                                                                 │
-│                        CRITIC AGENT                             │
-│  Runs after each major step → loops back to Planner on failure: │
-│                                                                 │
-│  ├── validate_calculations()    → primary + secondary + OOP     │
-│  │                                 == total_charges?            │
-│  ├── validate_codes()           → All CPT/ICD-10 in valid set?  │
-│  ├── validate_preauth()         → All required pre-auths exist? │
-│  └── validate_compliance()      → Non-duplication rule held?    │
-│                                    Secondary ≤ what it would    │
-│                                    pay as primary?              │
-│                                                                 │
-│  → Any check fails? → return to Planner with error context      │
-└─────────────────────────────────────────────────────────────────┘
+                    ┌─────────────────┐
+                    │   User Query    │
+                    │  (user_query.txt)│
+                    └────────┬────────┘
+                             │
+                    ┌────────▼────────┐
+                    │  Planner Agent  │ ◄── Decides which tools to invoke
+                    │  (11 tools)     │
+                    └────────┬────────┘
+                             │
+        ┌────────────────────┼────────────────────┐
+        │                    │                    │
+   ┌────▼────┐         ┌────▼────┐          ┌────▼────┐
+   │parse_   │         │parse_   │          │parse_   │
+   │image()  │         │pdf()    │          │text()   │
+   │EasyOCR  │         │pdfplumber│         │Intent   │
+   └────┬────┘         └────┬────┘          └────┬────┘
+        │                    │                    │
+        └────────────────────┼────────────────────┘
+                             │
+                    ┌────────▼────────┐
+                    │lookup_medical_  │
+                    │code()           │
+                    │CPT / ICD-10 map │
+                    └────────┬────────┘
+                             │
+                    ┌────────▼────────┐
+                    │calculate_claim()│
+                    │COB Engine       │
+                    │Employee-First   │
+                    └────────┬────────┘
+                             │
+        ┌────────────────────┼────────────────────┐
+        │                    │                    │
+   ┌────▼────┐         ┌────▼────┐          ┌────▼────┐
+   │generate_│         │generate_│          │generate_│
+   │preauth()│         │visual() │          │briefing()│
+   └────┬────┘         └────┬────┘          └────┬────┘
+        │                    │                    │
+        └────────────────────┼────────────────────┘
+                             │
+                    ┌────────▼────────┐
+                    │  Critic Agent   │ ◄── Validates all outputs
+                    │  (4 checks)     │
+                    └────────┬────────┘
+                             │
+                    ┌────────▼────────┐
+                    │   Loop back?    │──── Yes ──► Re-execute failed stage
+                    └────────┬────────┘
+                             │ No
+                    ┌────────▼────────┐
+                    │    COMPLETE     │
+                    └─────────────────┘
 ```
 
-### State Machine
+### Planner Agent (decides actions)
+
+| Tool | Description |
+|------|-------------|
+| `parse_image()` | OCR extraction via EasyOCR / pytesseract |
+| `parse_pdf()` | Clinical text extraction via pdfplumber |
+| `parse_text()` | User query intent and entity parsing |
+| `lookup_medical_code()` | Map descriptions to CPT/ICD-10 codes |
+| `verify_coverage()` | Check coverage via mock insurance API |
+| `calculate_claim()` | Run COB determination + financial calc |
+| `check_preauth()` | Check pre-authorization requirements |
+| `generate_preauth()` | Generate IRDAI-compliant pre-auth letters |
+| `generate_visual()` | Create cost flow visualizations |
+| `generate_briefing()` | Create patient-friendly summary |
+| `validate_calculation()` | Trigger Critic agent checks |
+
+### Critic Agent (validates results)
+
+| Validation | Check | Reflection Loop |
+|------------|-------|-----------------|
+| `validate_calculations()` | primary + secondary + OOP == total_charges | `if total != expected: recalculate()` |
+| `validate_codes()` | All CPT/ICD-10 codes in valid set | `if code invalid: remap_code()` |
+| `validate_preauth()` | All required pre-auth letters generated | `if missing: generate_preauth()` |
+| `validate_compliance()` | IRDAI non-duplication rule held | `if violated: fix_compliance()` |
+
+### 6-State Pipeline
 
 ```
 INTAKE → EXTRACTION → COB_REASONING → DOCUMENT_GENERATION → VALIDATION → COMPLETE
-                                                                 │
-                                                     (if fails) ↓
-                                                         loop back to
-                                                        relevant state
+                                                                   │
+                                                              (loop back on failure)
 ```
 
-### Sequence Diagram
+## Financial Results
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant Planner as Planner Agent
-    participant Intake as Intake Agent
-    participant OCR as OCR/PDF Parser
-    participant Coder as Medical Coding Agent
-    participant COB as COB Agent
-    participant API as Mock Insurance APIs
-    participant Critic as Critic/Validation Agent
-    participant PreAuth as Pre-Auth Generator
-    participant Viz as Visualization Agent
-    participant Output as Final Outputs
+### Aarav's ACL Surgery (₹4,50,000)
 
-    User->>Planner: Submit multi-modal inputs
-    Planner->>Intake: Load 4 input files
-    Intake->>OCR: Parse images (EasyOCR) + PDF (pdfplumber)
-    OCR-->>Intake: Raw extracted text
-    Intake->>Coder: Map descriptions → CPT/ICD-10 codes
-    Coder-->>Planner: Structured medical data
+| Step | Description | Amount |
+|------|-------------|--------|
+| 1 | Total Charges | ₹4,50,000 |
+| 2 | **Primary** (Plan B) Deductible | -₹15,000 |
+| 3 | Plan B pays 70% of ₹4,35,000 | ₹3,04,500 |
+| 4 | Remainder to Secondary | ₹1,45,500 |
+| 5 | **Secondary** (Plan A) Deductible | -₹10,000 |
+| 6 | Plan A pays 80% of ₹1,35,500 | ₹1,08,400 |
+| **7** | **Patient OOP** | **₹37,100** |
 
-    Planner->>COB: Determine primary/secondary
-    COB->>API: Verify coverage (Plan A & Plan B)
-    API-->>COB: Coverage details + deductibles
-    COB->>COB: Calculate primary claim
-    COB->>COB: Calculate secondary claim (on remainder)
-    COB-->>Planner: Financial breakdown + savings
+### Priya's Physical Therapy (₹30,000)
 
-    Planner->>Critic: Validate calculations
-    Critic->>Critic: Check: primary + secondary + OOP = total?
-    Critic->>Critic: Check: all pre-auths identified?
-    alt Validation Fails
-        Critic-->>Planner: Recalculate / fix issues
-    end
-    Critic-->>Planner: All checks passed ✓
+| Step | Description | Amount |
+|------|-------------|--------|
+| 1 | Total Charges | ₹30,000 |
+| 2 | **Primary** (Plan A) Deductible | -₹10,000 |
+| 3 | Plan A pays 80% of ₹20,000 | ₹16,000 |
+| 4 | Remainder to Secondary | ₹14,000 |
+| 5 | **Secondary** (Plan B) Deductible ₹15,000 > remainder | -₹14,000 |
+| 6 | Plan B pays | ₹0 |
+| **7** | **Patient OOP** | **₹14,000** |
 
-    Planner->>PreAuth: Generate IRDAI-compliant letters
-    Planner->>Viz: Generate cost flow diagrams
-    Planner->>Output: Compile patient briefing
+### Family Summary
 
-    Output-->>User: Letters + Visuals + Briefing + Breakdown
+| Claim | Total | Primary Pays | Secondary Pays | Patient OOP |
+|-------|-------|-------------|----------------|-------------|
+| Aarav (Surgery) | ₹4,50,000 | ₹3,04,500 | ₹1,08,400 | ₹37,100 |
+| Priya (Therapy) | ₹30,000 | ₹16,000 | ₹0 | ₹14,000 |
+| **Family Total** | **₹4,80,000** | **₹3,20,500** | **₹1,08,400** | **₹51,100** |
+
+**Family saves ₹1,08,400** with dual coverage vs single plan!
+
+## Medical Codes Used
+
+| Code | Type | Description |
+|------|------|-------------|
+| `29888` | CPT | ACL Reconstruction (Arthroscopic) |
+| `29881` | CPT | Meniscectomy (Arthroscopic) |
+| `97161` | CPT | Physical Therapy Evaluation |
+| `97110` | CPT | Therapeutic Exercise |
+| `S83.511A` | ICD-10 | ACL Tear, Right Knee |
+| `S83.211A` | ICD-10 | Medial Meniscus Tear, Right Knee |
+| `M54.50` | ICD-10 | Low Back Pain, Unspecified |
+
+> **Note**: `M54.50` is used instead of the deprecated `M54.5` per ICD-10-CM 2024 updates.
+
+## Setup & Running
+
+```bash
+# 1. Clone and install dependencies
+git clone https://github.com/vinayakmish/duco-agent-ai-assessment.git
+cd duco-agent-ai-assessment
+pip install -r requirements.txt
+
+# 2. Generate mock medical documents + run full pipeline
+python main.py --generate-data
+
+# 3. Run only mock data generation
+python main.py --data-only
+
+# 4. Run with verbose logging
+python main.py --generate-data -v
+
+# 5. Run tests
+python -m pytest tests/ -v
 ```
 
-## Multi-Modal Inputs
+## Generated Outputs
 
-| File | Type | Contents |
-|------|------|----------|
-| `priya_pt_invoice.png` | Image | Scanned PT invoice with handwritten notes, ₹30,000 total |
-| `aarav_mri_report.pdf` | PDF | MRI report confirming ACL + meniscus tear |
-| `surgeon_estimate.jpg` | Image | Surgeon's billing sheet: CPT 29888 + 29881, ₹4,50,000 |
-| `user_query.txt` | Text | Aarav's voice-to-text transcript requesting COB help |
-
-## Assumptions
-
-> **Note**: Actual policy values were not provided in the assessment. The following deductibles, coinsurance percentages, and OOP maximums are mock values used for demonstrating the COB engine. These can be easily reconfigured via `config/insurance_plans.json`.
-
-| Parameter | Plan A (Insurer1) | Plan B (Insurer2) |
-|-----------|-------------------|-------------------|
-| Primary Holder | Priya | Aarav |
-| Annual Deductible | ₹10,000 | ₹15,000 |
-| Coinsurance | 80/20 | 70/30 |
-| OOP Maximum | ₹1,00,000 | ₹1,50,000 |
-
-## COB Savings Summary
-
-| Claim | Without COB | With COB | **Savings** |
-|-------|-------------|----------|-------------|
-| Aarav's ACL Surgery (₹4,50,000) | ₹1,45,500 | ₹27,100 | **₹1,18,400** |
-| Priya's PT Sessions (₹30,000) | ₹14,000 | ₹14,000 | ₹0 |
-| **Family Total** | **₹1,59,500** | **₹41,100** | **₹1,18,400** |
+| Output | Format | Description |
+|--------|--------|-------------|
+| `preauth_aarav_planB.txt` | Text | Pre-auth letter for Aarav → Insurer2 (Primary) |
+| `preauth_aarav_planA.txt` | Text | Pre-auth letter for Aarav → Insurer1 (Secondary) |
+| `preauth_priya_planA.txt` | Text | Pre-auth letter for Priya → Insurer1 |
+| `cob_cover_aarav.txt` | Text | COB cover letter for secondary insurer |
+| `cost_breakdown.png` | Image | Stacked bar chart — payment breakdown |
+| `savings_comparison.png` | Image | With COB vs Without COB comparison |
+| `cost_flow_diagram.png` | Image | Visual money flow diagram |
+| `financial_breakdown.md` | Markdown | Detailed step-by-step financial report |
+| `patient_briefing.txt` | Text | Plain-language patient summary |
+| `pipeline_result.json` | JSON | Full pipeline execution results |
 
 ## Project Structure
 
 ```
 duco-agent-ai-assessment/
-├── README.md
-├── requirements.txt
-├── main.py
+├── main.py                          # CLI entry point
+├── requirements.txt                 # Python dependencies
 ├── config/
-│   └── insurance_plans.json
+│   └── insurance_plans.json         # Plan A & B configuration
 ├── data/
-│   ├── priya_pt_invoice.png
-│   ├── aarav_mri_report.pdf
-│   ├── surgeon_estimate.jpg
-│   └── user_query.txt
+│   ├── user_query.txt               # Aarav's voice-to-text query
+│   ├── priya_pt_invoice.png         # (generated) PT invoice image
+│   ├── aarav_mri_report.pdf         # (generated) MRI radiology report
+│   └── surgeon_estimate.jpg         # (generated) Surgeon's estimate
 ├── agents/
-│   ├── intake_agent.py
-│   ├── cob_agent.py
-│   ├── preauth_agent.py
-│   └── output_agent.py
-├── api/
-│   ├── mock_insurance_api.py
-│   └── plan_data.py
-├── models/
-│   ├── claim.py
-│   └── policy.py
+│   ├── intake_agent.py              # Multi-modal document ingestion
+│   ├── cob_agent.py                 # COB determination + calculations
+│   ├── preauth_agent.py             # Pre-auth letter generation
+│   └── output_agent.py              # Output orchestration
 ├── orchestrator/
-│   ├── planner.py
-│   ├── critic.py
-│   ├── state_machine.py
-│   └── tools.py
+│   ├── planner.py                   # Planner Agent (11 tools)
+│   ├── critic.py                    # Critic Agent (4 validation loops)
+│   ├── state_machine.py             # 6-state pipeline
+│   └── tools.py                     # Tool registry with logging
 ├── parsers/
-│   ├── ocr_parser.py
-│   ├── pdf_parser.py
-│   ├── text_parser.py
-│   └── medical_code_mapper.py
-├── templates/
-│   ├── preauth_letter.j2
-│   └── cob_cover_letter.j2
+│   ├── ocr_parser.py                # EasyOCR + pytesseract fallback
+│   ├── pdf_parser.py                # pdfplumber clinical extraction
+│   ├── text_parser.py               # User query intent parser
+│   └── medical_code_mapper.py       # CPT/ICD-10 code mapping
+├── models/
+│   ├── policy.py                    # Patient/role data models
+│   └── claim.py                     # Claim/EOB/COBResult models
+├── api/
+│   ├── mock_insurance_api.py        # FastAPI mock insurance endpoints
+│   └── plan_data.py                 # Insurance plan dataclasses
 ├── outputs/
-│   ├── cost_flow_visualizer.py
-│   ├── financial_report.py
-│   ├── patient_briefing.py
-│   └── preauth_pdf.py
-├── tests/
-│   ├── test_intake_agent.py
-│   ├── test_cob_agent.py
-│   ├── test_preauth_agent.py
-│   ├── test_mock_api.py
-│   └── test_calculations.py
+│   ├── cost_flow_visualizer.py      # matplotlib charts
+│   ├── financial_report.py          # Markdown report generator
+│   └── patient_briefing.py          # Patient summary + optional audio
 ├── scripts/
-│   └── generate_mock_data.py
-└── output/                           # Generated at runtime
+│   └── generate_mock_data.py        # Generates realistic mock documents
+└── tests/
+    ├── test_intake_agent.py         # 14 parser/mapper tests
+    ├── test_cob_agent.py            # 14 COB calculation tests
+    └── test_mock_api.py             # 9 API integration tests
 ```
 
-## Setup & Usage
+## Tests (37 total)
 
-### Prerequisites
-- Python 3.11+
-- Tesseract OCR (for pytesseract fallback)
-
-### Installation
-```bash
-git clone https://github.com/vinayakmish/duco-agent-ai-assessment.git
-cd duco-agent-ai-assessment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
+```
+tests/test_intake_agent.py     — 14 tests (OCR mapping, code validation, text parsing)
+tests/test_cob_agent.py        — 14 tests (COB math, invariants, IRDAI compliance)
+tests/test_mock_api.py         —  9 tests (API endpoints, coverage, pre-auth)
 ```
 
-### Generate Mock Data
-```bash
-python scripts/generate_mock_data.py
-```
+All 37 tests passing ✓
 
-### Run the Agent
-```bash
-python main.py
-```
+## Assumptions & Disclaimers
 
-### Run Tests
-```bash
-pytest tests/ -v
-```
+> **Important**: The actual insurance policy values (deductibles, coinsurance percentages,
+> OOP maximums) were **not provided** in the assessment problem statement. The values used
+> here are **mock/assumed values** chosen to demonstrate the COB calculation engine:
+>
+> | Parameter | Plan A | Plan B |
+> |-----------|--------|--------|
+> | Deductible | ₹10,000 | ₹15,000 |
+> | Coinsurance | 80/20 | 70/30 |
+> | OOP Maximum | ₹1,00,000 | ₹1,50,000 |
+>
+> In production, these values would be fetched from the actual insurance policy documents
+> or TPA (Third Party Administrator) APIs.
 
-## Outputs Generated
-- `output/cost_flow_sankey.png` — Sankey diagram of money flows
-- `output/savings_comparison.png` — COB vs. single coverage comparison
-- `output/financial_breakdown.md` — Detailed financial report
-- `output/preauth_aarav_planB.pdf` — Pre-auth letter (primary)
-- `output/preauth_aarav_planA.pdf` — Pre-auth letter (secondary)
-- `output/preauth_priya_planA.pdf` — Pre-auth letter (PT)
-- `output/patient_briefing.txt` — Plain language patient summary
+## Git Workflow
 
-## License
+- **Branch Protection**: `main` branch requires Pull Requests (no direct commits)
+- **Feature Branches**: `feature/intake-agent`, `feature/mock-apis`, `feature/cob-logic`, `feature/multi-modal-outputs`, `feature/orchestrator`
+- **Semantic Commits**: All commits follow `feat(scope): description` convention
+- **Squash Merge**: PRs merged via squash merge for clean history
 
-Private repository — not for redistribution.
+## Tech Stack
+
+- **Python 3.12+**
+- **EasyOCR / pytesseract** — Image text extraction (OCR)
+- **pdfplumber** — PDF clinical text parsing
+- **FastAPI** — Mock insurance API
+- **matplotlib** — Cost flow visualizations
+- **Pillow + reportlab** — Mock document generation
+- **Jinja2** — Pre-auth letter templating
+- **Rich** — Terminal output formatting
+- **pytest** — Test framework
